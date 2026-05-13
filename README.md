@@ -1,8 +1,8 @@
-# Pi Web
+# Pi Local Websearch
 
 Pi extension package that adds bounded web search and page extraction tools.
 
-`pi-web` uses local system CLIs instead of hosted API keys:
+`pi-local-websearch` uses local system CLIs instead of hosted API keys:
 
 - `web_search` wraps [`ddgr`](https://github.com/jarun/ddgr).
 - `web_fetch` wraps [`trafilatura`](https://github.com/adbar/trafilatura) with XML output.
@@ -29,7 +29,13 @@ ddgr --version
 trafilatura --version
 ```
 
-Install from GitHub with Pi:
+Install from npm with Pi:
+
+```bash
+pi install npm:pi-local-websearch
+```
+
+Alternatively, install directly from GitHub:
 
 ```bash
 pi install git:github.com/vihu/pi-web
@@ -40,7 +46,7 @@ Then restart Pi, or run `/reload` in an existing session if your Pi version supp
 For project-local installation instead of global installation:
 
 ```bash
-pi install -l git:github.com/vihu/pi-web
+pi install -l npm:pi-local-websearch
 ```
 
 For local development from a checkout:
@@ -121,7 +127,7 @@ Common parameters:
 
 ## Safety notes
 
-`pi-web` is intended for public web access. It does not add a first-use confirmation gate.
+`pi-local-websearch` is intended for public web access. It does not add a first-use confirmation gate.
 
 `web_fetch` blocks obvious SSRF-style targets before invoking `trafilatura`, including localhost, private networks, link-local addresses, reserved documentation ranges, multicast, and IPv6 local ranges. It also resolves hostnames and rejects DNS results that point at blocked IP ranges.
 

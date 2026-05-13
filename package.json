@@ -1,5 +1,5 @@
 {
-  "name": "pi-web",
+  "name": "pi-local-websearch",
   "version": "0.1.0",
   "description": "Pi web search and extraction tools backed by ddgr and trafilatura.",
   "type": "module",
