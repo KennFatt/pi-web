@@ -21,7 +21,11 @@ export function boundedExcerpt(value: string, maxBytes = 2_000): string {
     : truncation.content;
 }
 
-export function applyModelVisibleCap(text: string, maxBytes: number): ModelCapResult {
+export function applyModelVisibleCap(
+  text: string,
+  maxBytes: number,
+  artifactNotice = "Full XML/text paths are available in tool details.",
+): ModelCapResult {
   const truncation = truncateHead(text, {
     maxBytes,
     maxLines: DEFAULT_MAX_LINES,
@@ -38,7 +42,7 @@ export function applyModelVisibleCap(text: string, maxBytes: number): ModelCapRe
     `[Output capped for model context: showing ${truncation.outputLines} of ${truncation.totalLines} lines`,
     `(${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}).`,
     `${omittedLines} lines (${formatSize(omittedBytes)}) omitted from the model-visible response.`,
-    "Full XML/text paths are available in tool details.]",
+    `${artifactNotice}]`,
   ].join(" ");
 
   return {
@@ -57,4 +61,11 @@ export async function saveFetchArtifacts(xml: string, text: string): Promise<Fet
     writeFile(fullTextPath, text, "utf8"),
   ]);
   return { tempDir, fullXmlPath, fullTextPath };
+}
+
+export async function saveRawFetchArtifacts(text: string): Promise<FetchArtifacts> {
+  const tempDir = await mkdtemp(join(tmpdir(), "pi-web-"));
+  const fullTextPath = join(tempDir, "document.txt");
+  await writeFile(fullTextPath, text, "utf8");
+  return { tempDir, fullTextPath };
 }

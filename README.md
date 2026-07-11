@@ -5,7 +5,7 @@ Pi extension package that adds bounded web search and page extraction tools.
 `pi-local-websearch` uses local system CLIs instead of hosted API keys:
 
 - `web_search` wraps [`ddgr`](https://github.com/jarun/ddgr).
-- `web_fetch` wraps [`trafilatura`](https://github.com/adbar/trafilatura) with XML output.
+- `web_fetch` wraps [`trafilatura`](https://github.com/adbar/trafilatura) with XML output and falls back to raw text-like HTTP responses.
 
 ## Status
 
@@ -14,10 +14,10 @@ Early MVP.
 Implemented now:
 
 - `web_search` tool using `ddgr --json`
-- `web_fetch` tool using `trafilatura --xml --with-metadata`
+- `web_fetch` tool using `trafilatura --xml --with-metadata`, with raw text-like response fallback
 - default USA search region (`us-en`)
 - model-visible output caps
-- full fetched XML and derived text artifacts in `/tmp/pi-web-*` when fetch output is capped
+- full XML artifacts for Trafilatura results and text artifacts for extracted or raw results in `/tmp/pi-web-*` when fetch output is capped
 - URL safety checks for fetches: only `http`/`https`, no embedded credentials, blocks localhost/private/link-local/reserved IP targets
 
 ## Installation
@@ -97,7 +97,7 @@ Common parameters:
 
 ### `web_fetch`
 
-Fetch and extract readable text from one HTTP(S) URL with `trafilatura --xml`.
+Fetch and extract readable text from one HTTP(S) URL with `trafilatura --xml`; raw text-like resources are returned unchanged when extraction is unavailable.
 
 Important defaults and limits:
 
@@ -107,8 +107,8 @@ Important defaults and limits:
 - comments excluded by default
 - tables included by default
 - if output is capped, full artifacts are written to:
-  - `/tmp/pi-web-*/document.xml`
-  - `/tmp/pi-web-*/document.txt`
+  - `/tmp/pi-web-*/document.xml` for Trafilatura extraction
+  - `/tmp/pi-web-*/document.txt` for extracted or raw text
 
 Common parameters:
 

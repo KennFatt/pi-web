@@ -91,15 +91,24 @@ export interface ExtractedDocument {
 
 export interface FetchArtifacts {
   tempDir: string;
-  fullXmlPath: string;
+  fullXmlPath?: string;
   fullTextPath: string;
 }
 
+export interface RawFetchResponse {
+  status: number;
+  finalUrl: string;
+  contentType?: string;
+  text: string;
+}
+
 export interface WebFetchDetails extends ExtractedDocument {
-  provider: "trafilatura";
+  provider: "trafilatura" | "http";
   args: string[];
   text: string;
   truncated: boolean;
+  status?: number;
+  contentType?: string;
   truncation?: TruncationResult;
   tempDir?: string;
   fullXmlPath?: string;

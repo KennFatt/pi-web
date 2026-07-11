@@ -31,7 +31,7 @@ const WebSearchParams = Type.Object({
 const WebFetchParams = Type.Object({
   url: Type.String({ description: "HTTP(S) URL to fetch and extract with trafilatura" }),
   timeoutMs: Type.Optional(Type.Number({ description: `Subprocess timeout in milliseconds (default ${DEFAULT_FETCH_TIMEOUT_MS}, max ${MAX_FETCH_TIMEOUT_MS})` })),
-  maxChars: Type.Optional(Type.Number({ description: `Maximum model-visible text bytes/chars (default ${DEFAULT_FETCH_MAX_CHARS}, max ${MAX_FETCH_MAX_CHARS}); full text/XML are saved to /tmp when capped` })),
+  maxChars: Type.Optional(Type.Number({ description: `Maximum model-visible text bytes/chars (default ${DEFAULT_FETCH_MAX_CHARS}, max ${MAX_FETCH_MAX_CHARS}); full text is saved to /tmp when capped, with XML also saved for extracted pages` })),
   includeComments: Type.Optional(Type.Boolean({ description: "Include extracted comments (default false)" })),
   includeTables: Type.Optional(Type.Boolean({ description: "Include extracted tables (default true)" })),
   includeLinks: Type.Optional(Type.Boolean({ description: "Ask trafilatura to include links in XML output (default false)" })),
@@ -51,7 +51,8 @@ function summarizeFetch(details: WebFetchDetails | undefined): string {
   const title = details.title ? `${details.title}\n` : "";
   const cap = details.truncated ? " (capped; full files saved)" : "";
   const host = details.hostname ?? new URL(details.finalUrl ?? details.url).hostname;
-  return `${title}${host}${cap}`;
+  const provider = details.provider === "http" ? `HTTP ${details.status ?? ""}`.trim() : "Trafilatura";
+  return `${title}${provider} ${host}${cap}`;
 }
 
 export default function piWebExtension(pi: ExtensionAPI) {
@@ -90,10 +91,10 @@ export default function piWebExtension(pi: ExtensionAPI) {
     name: "web_fetch",
     label: "Web Fetch",
     description:
-      "Fetch and extract one HTTP(S) URL using installed trafilatura with --xml. Model-visible text is capped; full XML and text are saved to /tmp when capped. Blocks localhost/private/reserved URL targets.",
-    promptSnippet: "Fetch and extract readable page text via trafilatura --xml",
+      "Fetch one HTTP(S) URL with installed trafilatura using --xml, falling back to raw text-like responses. Model-visible text is capped; full artifacts are saved to /tmp when capped. Blocks localhost/private/reserved URL targets.",
+    promptSnippet: "Fetch readable page text via trafilatura --xml, or raw text-like resources when extraction is unavailable",
     promptGuidelines: [
-      "Use web_fetch for specific HTTP(S) sources when the page content is needed, especially documentation, papers, and articles.",
+      "Use web_fetch for specific HTTP(S) sources when the page content is needed, including documentation, source files, data, papers, and articles.",
       "web_fetch caps only the model-visible text; if fullTextPath or fullXmlPath is returned, use the read tool on those paths when more source text is needed.",
     ],
     parameters: WebFetchParams,
