@@ -52,7 +52,10 @@ function summarizeFetch(details: WebFetchDetails | undefined): string {
   const cap = details.truncated ? " (capped; full files saved)" : "";
   const host = details.hostname ?? new URL(details.finalUrl ?? details.url).hostname;
   const provider = details.provider === "http" ? `HTTP ${details.status ?? ""}`.trim() : "Trafilatura";
-  return `${title}${provider} ${host}${cap}`;
+  const contentType = details.provider === "http" && details.contentType
+    ? ` (${details.contentType})`
+    : "";
+  return `${title}${provider}${contentType} ${host}${cap}`;
 }
 
 export default function piWebExtension(pi: ExtensionAPI) {
