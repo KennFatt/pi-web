@@ -1,55 +1,45 @@
 # Pi Local Websearch
 
-Pi extension package that adds bounded web search and page extraction tools.
-
-`pi-local-websearch` uses local system CLIs instead of hosted API keys:
+Pi extension package that adds bounded web search and page extraction tools using local system CLIs.
 
 - `web_search` wraps [`ddgr`](https://github.com/jarun/ddgr).
-- `web_fetch` wraps [`trafilatura`](https://github.com/adbar/trafilatura) with XML output and falls back to raw text-like HTTP responses.
+- `web_fetch` wraps the [`web-fetch`](https://github.com/kennanfattahillah/core) shell command, which internally orchestrates trafilatura, shot-scraper, and curl with caching.
 
 ## Status
 
-Early MVP.
-
-Implemented now:
+Implemented:
 
 - `web_search` tool using `ddgr --json`
-- `web_fetch` tool using `trafilatura --xml --with-metadata`, with raw text-like response fallback
+- `web_fetch` tool as a thin proxy to the `web-fetch` shell function
 - default USA search region (`us-en`)
-- model-visible output caps
-- full XML artifacts for Trafilatura results and text artifacts for extracted or raw results in `/tmp/pi-web-*` when fetch output is capped
+- downstream output truncation via `--max-lines` (default 500); full content cached at `~/.cache/web-fetch/<sha>.markdown`
 - URL safety checks for fetches: only `http`/`https`, no embedded credentials, blocks localhost/private/link-local/reserved IP targets
 
 ## Installation
 
-Install the runtime CLIs first and make sure they are available on the same `PATH` used by Pi:
+### Prerequisites
+
+`ddgr` must be on `PATH`:
 
 ```bash
 ddgr --version
-trafilatura --version
 ```
 
-Install from npm with Pi:
+The `web-fetch` shell function must be defined in your interactive shell configuration. The Pi tool probes it via `$SHELL -i -c "type web-fetch"`.
+
+Verify it is available:
+
+```bash
+$SHELL -i -c "type web-fetch"
+```
+
+### Install the package
 
 ```bash
 pi install npm:pi-local-websearch
 ```
 
-Alternatively, install directly from GitHub:
-
-```bash
-pi install git:github.com/vihu/pi-web
-```
-
-Then restart Pi, or run `/reload` in an existing session if your Pi version supports extension reloads.
-
-For project-local installation instead of global installation:
-
-```bash
-pi install -l npm:pi-local-websearch
-```
-
-For local development from a checkout:
+Or from a local checkout:
 
 ```bash
 git clone https://github.com/vihu/pi-web.git
@@ -58,78 +48,47 @@ npm install
 pi -e .
 ```
 
-To use a local checkout globally without installing from GitHub, add its absolute path to Pi settings or run:
-
-```bash
-pi install /absolute/path/to/pi-web
-```
-
 ## Usage
 
-After installation, Pi exposes two tools to the agent.
+After installation, Pi exposes two tools.
 
 ### `web_search`
 
 Search the web with `ddgr` and return compact ranked results.
 
-Important defaults and limits:
-
-- default results: `8`
-- max results: `25`
-- default region: `us-en` (USA)
-- default safe search: enabled
-- default timeout: `10000ms`
-- DuckDuckGo bang queries beginning with `!` are rejected
-
-Common parameters:
-
-```jsonc
-{
-  "query": "Pi coding agent packages",
-  "maxResults": 8,
-  "site": "github.com",
-  "region": "us-en",
-  "timeRange": "m",
-  "safeSearch": true,
-  "timeoutMs": 10000,
-}
-```
+| Parameter | Default | Max | Description |
+|---|---|---|---|
+| `query` | (required) | — | Search query. Leading `!` bang queries are rejected |
+| `maxResults` | 8 | 25 | Number of results |
+| `site` | — | — | Domain restriction, e.g. `github.com` |
+| `region` | `us-en` | — | DuckDuckGo region code |
+| `timeRange` | — | — | `d`/`w`/`m`/`y` |
+| `safeSearch` | `true` | — | Safe search toggle |
+| `timeoutMs` | 10000 | 30000 | Subprocess timeout |
 
 ### `web_fetch`
 
-Fetch and extract readable text from one HTTP(S) URL with `trafilatura --xml`; raw text-like resources are returned unchanged when extraction is unavailable.
+Fetch and extract readable text from one HTTP(S) URL via the `web-fetch` shell command. Output is truncated to the first N lines by default; full content is cached downstream.
 
-Important defaults and limits:
+| Parameter | Default | Max | Description |
+|---|---|---|---|
+| `url` | (required) | — | HTTP(S) URL to fetch |
+| `maxLines` | 500 | — | Lines of output; downstream caches full content |
+| `timeoutMs` | 30000 | 60000 | Subprocess timeout |
+| `renderWaitMs` | 2000 | 10000 | Browser wait before extraction |
+| `xml` | `false` | — | Request raw XML instead of markdown |
 
-- default timeout: `20000ms`
-- default model-visible cap: `12000`
-- max model-visible cap: `50000`
-- comments excluded by default
-- tables included by default
-- if output is capped, full artifacts are written to:
-  - `/tmp/pi-web-*/document.xml` for Trafilatura extraction
-  - `/tmp/pi-web-*/document.txt` for extracted or raw text
+When output is truncated, the downstream prints a footer like:
 
-Common parameters:
-
-```jsonc
-{
-  "url": "https://example.com/article",
-  "maxChars": 12000,
-  "timeoutMs": 20000,
-  "includeComments": false,
-  "includeTables": true,
-  "includeLinks": false,
-  "includeImages": false,
-  "fast": false,
-}
 ```
+[truncated: full content at /Users/.../.cache/web-fetch/abc123.markdown]
+```
+
+The agent can use the `read` tool on that path to retrieve more content. The TUI summary shows `(truncated)` when this occurs.
 
 ## Safety notes
 
-`pi-local-websearch` is intended for public web access. It does not add a first-use confirmation gate.
-
-`web_fetch` blocks obvious SSRF-style targets before invoking `trafilatura`, including localhost, private networks, link-local addresses, reserved documentation ranges, multicast, and IPv6 local ranges. It also resolves hostnames and rejects DNS results that point at blocked IP ranges.
+`web_fetch` blocks SSRF-style targets before invoking the shell command: localhost, private networks, link-local addresses, reserved documentation ranges, multicast, and IPv6 local ranges. It also resolves hostnames and rejects DNS results that point at blocked IP ranges.
 
 Pi packages run with full system access. Review package source before installing third-party packages.
 

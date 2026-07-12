@@ -1,17 +1,17 @@
-import type { TruncationResult } from "@earendil-works/pi-coding-agent";
-
 export const DEFAULT_SEARCH_MAX_RESULTS = 8;
 export const MAX_SEARCH_RESULTS = 25;
 export const DEFAULT_SEARCH_TIMEOUT_MS = 10_000;
 export const MAX_SEARCH_TIMEOUT_MS = 30_000;
-export const DEFAULT_SEARCH_REGION = "us-en";
+export const DEFAULT_SEARCH_REGION = 'us-en';
 
-export const DEFAULT_FETCH_TIMEOUT_MS = 20_000;
+export const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
 export const MAX_FETCH_TIMEOUT_MS = 60_000;
-export const DEFAULT_FETCH_MAX_CHARS = 12_000;
-export const MAX_FETCH_MAX_CHARS = 50_000;
+export const DEFAULT_FETCH_MAX_LINES = 500;
+export const DEFAULT_FETCH_RENDER_WAIT_MS = 2_000;
+export const MAX_FETCH_RENDER_WAIT_MS = 10_000;
+export const WEB_FETCH_PROBE_TIMEOUT_MS = 2_000;
 
-export type WebSearchTimeRange = "d" | "w" | "m" | "y";
+export type WebSearchTimeRange = 'd' | 'w' | 'm' | 'y';
 
 export interface WebSearchInput {
   query: string;
@@ -43,7 +43,7 @@ export interface WebSearchResult {
 
 export interface WebSearchDetails {
   query: string;
-  provider: "ddgr";
+  provider: 'ddgr';
   args: string[];
   results: WebSearchResult[];
   stderr?: string;
@@ -57,61 +57,15 @@ export interface ToolRunResult<Details> {
 export interface WebFetchInput {
   url: string;
   timeoutMs?: number;
-  maxChars?: number;
-  includeComments?: boolean;
-  includeTables?: boolean;
-  includeLinks?: boolean;
-  includeImages?: boolean;
-  fast?: boolean;
+  maxLines?: number;
+  renderWaitMs?: number;
+  xml?: boolean;
 }
 
-export interface NormalizedWebFetchInput {
+export interface WebFetchDetails {
   url: string;
-  timeoutMs: number;
-  maxChars: number;
-  includeComments: boolean;
-  includeTables: boolean;
-  includeLinks: boolean;
-  includeImages: boolean;
-  fast: boolean;
-}
-
-export interface ExtractedDocument {
-  url: string;
-  finalUrl?: string;
-  title?: string;
-  author?: string;
-  date?: string;
-  hostname?: string;
-  sitename?: string;
-  description?: string;
-  fingerprint?: string;
-  text: string;
-}
-
-export interface FetchArtifacts {
-  tempDir: string;
-  fullXmlPath?: string;
-  fullTextPath: string;
-}
-
-export interface RawFetchResponse {
-  status: number;
-  finalUrl: string;
-  contentType?: string;
-  text: string;
-}
-
-export interface WebFetchDetails extends ExtractedDocument {
-  provider: "trafilatura" | "http";
-  args: string[];
   text: string;
   truncated: boolean;
-  status?: number;
-  contentType?: string;
-  truncation?: TruncationResult;
-  tempDir?: string;
-  fullXmlPath?: string;
-  fullTextPath?: string;
+  exitCode: number;
   stderr?: string;
 }
