@@ -50,7 +50,9 @@ const WebSearchParams = Type.Object(
 
 const WebFetchParams = Type.Object(
   {
-    url: Type.String({ description: 'HTTP(S) URL to fetch via the web-fetch shell command' }),
+    url: Type.Union([Type.String(), Type.Array(Type.String(), { minItems: 1 })], {
+      description: 'One HTTP(S) URL or an array of HTTP(S) URLs to fetch via the web-fetch shell command',
+    }),
     timeoutMs: Type.Optional(
       Type.Number({
         description: `Subprocess timeout in milliseconds (default ${DEFAULT_FETCH_TIMEOUT_MS}, max ${MAX_FETCH_TIMEOUT_MS})`,
@@ -83,9 +85,9 @@ function summarizeSearch(details: WebSearchDetails | undefined): string {
 
 function summarizeFetch(details: WebFetchDetails | undefined): string {
   if (!details) return 'No details';
-  const host = new URL(details.url).hostname;
+  const hosts = details.urls.map((url) => new URL(url).hostname);
   const truncated = details.truncated ? ' (truncated)' : '';
-  return `web-fetch ${host}${truncated}`;
+  return `web-fetch ${hosts.join(', ')}${truncated}`;
 }
 
 export default function piWebExtension(pi: ExtensionAPI) {
@@ -124,7 +126,7 @@ export default function piWebExtension(pi: ExtensionAPI) {
     name: 'web_fetch',
     label: 'Web Fetch',
     description:
-      'Fetch one HTTP(S) URL with the installed web-fetch shell command. Blocks localhost/private/reserved URL targets.',
+      'Fetch one or more HTTP(S) URLs with the installed web-fetch shell command. Blocks localhost/private/reserved URL targets.',
     promptSnippet: 'Fetch readable page text via the web-fetch shell command (requires web-fetch to be installed)',
     promptGuidelines: [
       'Use web_fetch for specific HTTP(S) sources when the page content is needed, including documentation, source files, data, papers, and articles.',
@@ -140,8 +142,12 @@ export default function piWebExtension(pi: ExtensionAPI) {
     },
     renderCall(args, theme, context) {
       const text = (context.lastComponent as Text | undefined) ?? new Text('', 0, 0);
-      const url = typeof args?.url === 'string' ? args.url : '';
-      text.setText(`${theme.fg('toolTitle', theme.bold('web_fetch'))} ${theme.fg('accent', url)}`);
+      const urls = Array.isArray(args?.url)
+        ? args.url.filter((url): url is string => typeof url === 'string')
+        : typeof args?.url === 'string'
+          ? [args.url]
+          : [];
+      text.setText(`${theme.fg('toolTitle', theme.bold('web_fetch'))} ${theme.fg('accent', urls.join(', '))}`);
       return text;
     },
     renderResult(result, _options, theme, context) {

@@ -55,7 +55,7 @@ export interface ToolRunResult<Details> {
 }
 
 export interface WebFetchInput {
-  url: string;
+  url: string | string[];
   timeoutMs?: number;
   maxLines?: number;
   renderWaitMs?: number;
@@ -63,7 +63,7 @@ export interface WebFetchInput {
 }
 
 export interface WebFetchDetails {
-  url: string;
+  urls: string[];
   text: string;
   truncated: boolean;
   exitCode: number;

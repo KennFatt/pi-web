@@ -14,7 +14,7 @@ import { validateFetchUrl } from './safety.ts';
 import { boundedExcerpt } from './truncate.ts';
 
 interface NormalizedFetchInput {
-  url: string;
+  urls: string[];
   timeoutMs: number;
   maxLines: number;
   renderWaitMs: number;
@@ -34,10 +34,13 @@ function normalizeInteger(value: unknown, fallback: number, max: number, name: s
 
 export function normalizeFetchInput(input: WebFetchInput): NormalizedFetchInput {
   if (!input || typeof input !== 'object') throw new Error('web_fetch input must be an object');
-  if (typeof input.url !== 'string' || !input.url.trim()) throw new Error('url must be a non-empty string');
+  const urls = Array.isArray(input.url) ? input.url : [input.url];
+  if (urls.length === 0 || urls.some((url) => typeof url !== 'string' || !url.trim())) {
+    throw new Error('url must be a non-empty string or array of non-empty strings');
+  }
 
   return {
-    url: input.url.trim(),
+    urls: urls.map((url) => url.trim()),
     timeoutMs: normalizeInteger(input.timeoutMs, DEFAULT_FETCH_TIMEOUT_MS, MAX_FETCH_TIMEOUT_MS, 'timeoutMs'),
     maxLines: normalizeInteger(input.maxLines, DEFAULT_FETCH_MAX_LINES, Number.MAX_SAFE_INTEGER, 'maxLines'),
     renderWaitMs: normalizeInteger(
@@ -87,7 +90,7 @@ async function checkWebFetchAvailable(pi: Pick<ExtensionAPI, 'exec'>, signal?: A
 function buildWebFetchCommand(input: NormalizedFetchInput): string {
   const parts = [
     'web-fetch',
-    shellQuote(input.url),
+    ...input.urls.map(shellQuote),
     '--no-glow',
     '--max-lines',
     String(input.maxLines),
@@ -100,8 +103,8 @@ function buildWebFetchCommand(input: NormalizedFetchInput): string {
   return parts.join(' ');
 }
 
-export function renderFetchContent(url: string, text: string): string {
-  return `web_fetch: ${url}\n\n${text}`;
+export function renderFetchContent(urls: string[], text: string): string {
+  return `web_fetch: ${urls.join(', ')}\n\n${text}`;
 }
 
 export async function runWebFetch(
@@ -110,8 +113,8 @@ export async function runWebFetch(
   signal?: AbortSignal,
 ): Promise<ToolRunResult<WebFetchDetails>> {
   const normalized = normalizeFetchInput(input);
-  const safeUrl = await validateFetchUrl(normalized.url);
-  const safeInput = { ...normalized, url: safeUrl.toString() };
+  const safeUrls = await Promise.all(normalized.urls.map((url) => validateFetchUrl(url)));
+  const safeInput = { ...normalized, urls: safeUrls.map((url) => url.toString()) };
 
   await checkWebFetchAvailable(pi, signal);
 
@@ -133,7 +136,7 @@ export async function runWebFetch(
   const truncated = result.stdout.includes('[truncated:');
 
   const details: WebFetchDetails = {
-    url: safeInput.url,
+    urls: safeInput.urls,
     text: result.stdout,
     truncated,
     exitCode: result.code,
@@ -141,7 +144,7 @@ export async function runWebFetch(
   };
 
   return {
-    contentText: renderFetchContent(safeInput.url, result.stdout),
+    contentText: renderFetchContent(safeInput.urls, result.stdout),
     details,
   };
 }
