@@ -3,13 +3,14 @@ import { StringEnum } from '@earendil-works/pi-ai';
 import { Text } from '@earendil-works/pi-tui';
 import { Type } from 'typebox';
 import { runWebFetch } from './fetch.ts';
+import { DEFAULT_SEARCH_REGION } from './providers/ddgr/types.ts';
 import { runWebSearch } from './search.ts';
+import { createEmptyStreak } from './search-provider.ts';
 import {
   DEFAULT_FETCH_MAX_LINES,
   DEFAULT_FETCH_RENDER_WAIT_MS,
   DEFAULT_FETCH_TIMEOUT_MS,
   DEFAULT_SEARCH_MAX_RESULTS,
-  DEFAULT_SEARCH_REGION,
   DEFAULT_SEARCH_TIMEOUT_MS,
   MAX_FETCH_RENDER_WAIT_MS,
   MAX_FETCH_TIMEOUT_MS,
@@ -28,20 +29,24 @@ const WebSearchParams = Type.Object(
       }),
     ),
     site: Type.Optional(
-      Type.String({ description: 'Optional site/domain restriction passed to ddgr -w, e.g. example.com' }),
+      Type.String({ description: 'Optional site/domain restriction, e.g. example.com (ddgr -w, DeepSeek site: operator)' }),
     ),
     region: Type.Optional(
-      Type.String({ description: `DuckDuckGo region code (default ${DEFAULT_SEARCH_REGION} for USA)` }),
+      Type.String({
+        description: `Optional region code (ddgr default ${DEFAULT_SEARCH_REGION}; DeepSeek derives a lang: clause from it)`,
+      }),
     ),
     timeRange: Type.Optional(
-      StringEnum(['d', 'w', 'm', 'y'] as const, { description: 'Optional time range: d=day, w=week, m=month, y=year' }),
+      StringEnum(['d', 'w', 'm', 'y'] as const, {
+        description: 'Optional time range: d=day, w=week, m=month, y=year (DeepSeek maps it to after:)',
+      }),
     ),
     safeSearch: Type.Optional(
-      Type.Boolean({ description: 'Keep safe search enabled unless explicitly false (default true)' }),
+      Type.Boolean({ description: 'Keep safe search enabled unless explicitly false (default true; ddgr only, ignored by DeepSeek)' }),
     ),
     timeoutMs: Type.Optional(
       Type.Number({
-        description: `Subprocess timeout in milliseconds (default ${DEFAULT_SEARCH_TIMEOUT_MS}, max ${MAX_SEARCH_TIMEOUT_MS})`,
+        description: `Request timeout in milliseconds (default ${DEFAULT_SEARCH_TIMEOUT_MS}, max ${MAX_SEARCH_TIMEOUT_MS}); bounds the ddgr subprocess or the DeepSeek HTTP request`,
       }),
     ),
   },
@@ -75,12 +80,12 @@ const WebFetchParams = Type.Object(
 
 function summarizeSearch(details: WebSearchDetails | undefined): string {
   if (!details) return 'No details';
-  if (details.results.length === 0) return 'No results';
+  if (details.results.length === 0) return `${details.provider}: no results`;
   const top = details.results
     .slice(0, 3)
     .map((result) => result.url)
     .join('\n');
-  return `${details.results.length} result(s)\n${top}`;
+  return `${details.provider}: ${details.results.length} result(s)\n${top}`;
 }
 
 function summarizeFetch(details: WebFetchDetails | undefined): string {
@@ -91,19 +96,28 @@ function summarizeFetch(details: WebFetchDetails | undefined): string {
 }
 
 export default function piWebExtension(pi: ExtensionAPI) {
+  const emptyStreak = createEmptyStreak();
+  pi.on('session_start', () => {
+    emptyStreak.reset();
+  });
+
   pi.registerTool({
     name: 'web_search',
     label: 'Web Search',
     description:
-      'Search the web with the installed ddgr CLI. Returns compact ranked results. Defaults to USA region (us-en), safe search on, 8 results, and a 10s timeout.',
-    promptSnippet: 'Search the web via ddgr for current/external information',
+      'Search the web with the configured provider: the local ddgr CLI by default, or the DeepSeek Search API. Returns compact ranked results. Defaults to USA region (us-en) for ddgr, safe search on, 8 results, and a 10s timeout.',
+    promptSnippet: 'Search the web via the configured provider (ddgr by default) for current/external information',
     promptGuidelines: [
       'Use web_search when the user asks about current or external information that is not available in the local workspace.',
       'Use web_fetch after web_search when source content, documentation, or article text is needed; do not rely only on snippets for important claims.',
     ],
     parameters: WebSearchParams,
-    async execute(_toolCallId, params, signal) {
-      const result = await runWebSearch(pi, params, signal);
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      const result = await runWebSearch(pi, params, signal, { streak: emptyStreak });
+      const notice = result.details.notice;
+      if (notice && ctx.hasUI) {
+        ctx.ui.notify(notice, 'warning');
+      }
       return {
         content: [{ type: 'text' as const, text: result.contentText }],
         details: result.details,
