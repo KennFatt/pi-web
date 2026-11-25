@@ -1,6 +1,6 @@
 {
   "name": "pi-local-websearch",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Pi web search and extraction tools backed by ddgr, the DeepSeek Search API, and trafilatura.",
   "type": "module",
   "license": "MIT",
