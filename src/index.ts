@@ -29,24 +29,24 @@ const WebSearchParams = Type.Object(
       }),
     ),
     site: Type.Optional(
-      Type.String({ description: 'Optional site/domain restriction, e.g. example.com (ddgr -w, DeepSeek site: operator)' }),
+      Type.String({ description: 'Optional site/domain restriction, e.g. example.com (ddgr -w, DeepSeek site: operator; ignored by Gemini)' }),
     ),
     region: Type.Optional(
       Type.String({
-        description: `Optional region code (ddgr default ${DEFAULT_SEARCH_REGION}; DeepSeek derives a lang: clause from it)`,
+        description: `Optional region code (ddgr default ${DEFAULT_SEARCH_REGION}; DeepSeek derives a lang: clause from it; ignored by Gemini)`,
       }),
     ),
     timeRange: Type.Optional(
       StringEnum(['d', 'w', 'm', 'y'] as const, {
-        description: 'Optional time range: d=day, w=week, m=month, y=year (DeepSeek maps it to after:)',
+        description: 'Optional time range: d=day, w=week, m=month, y=year (DeepSeek maps it to after:; ignored by Gemini)',
       }),
     ),
     safeSearch: Type.Optional(
-      Type.Boolean({ description: 'Keep safe search enabled unless explicitly false (default true; ddgr only, ignored by DeepSeek)' }),
+      Type.Boolean({ description: 'Keep safe search enabled unless explicitly false (default true; ddgr only, ignored by DeepSeek and Gemini)' }),
     ),
     timeoutMs: Type.Optional(
       Type.Number({
-        description: `Request timeout in milliseconds (default ${DEFAULT_SEARCH_TIMEOUT_MS}, max ${MAX_SEARCH_TIMEOUT_MS}); bounds the ddgr subprocess or the DeepSeek HTTP request`,
+        description: `Request timeout in milliseconds (default ${DEFAULT_SEARCH_TIMEOUT_MS}, max ${MAX_SEARCH_TIMEOUT_MS}); bounds the ddgr subprocess, DeepSeek HTTP request, or Gemini HTTP request`,
       }),
     ),
   },
@@ -105,15 +105,19 @@ export default function piWebExtension(pi: ExtensionAPI) {
     name: 'web_search',
     label: 'Web Search',
     description:
-      'Search the web with the configured provider: the local ddgr CLI by default, or the DeepSeek Search API. Returns compact ranked results. Defaults to USA region (us-en) for ddgr, safe search on, 8 results, and a 10s timeout.',
-    promptSnippet: 'Search the web via the configured provider (ddgr by default) for current/external information',
+      'Search the web with the configured provider: the local ddgr CLI by default, the DeepSeek Search API, or Google Gemini Search Grounding when a whitelisted *gemini* model is active. Returns compact ranked results. Defaults to USA region (us-en) for ddgr, safe search on, 8 results, and a 10s timeout.',
+    promptSnippet: 'Search the web via ddgr by default, DeepSeek, or Gemini grounding on whitelisted *gemini* models for current/external information',
     promptGuidelines: [
       'Use web_search when the user asks about current or external information that is not available in the local workspace.',
       'Use web_fetch after web_search when source content, documentation, or article text is needed; do not rely only on snippets for important claims.',
     ],
     parameters: WebSearchParams,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      const result = await runWebSearch(pi, params, signal, { streak: emptyStreak });
+      const result = await runWebSearch(pi, params, signal, {
+        streak: emptyStreak,
+        activeModel: ctx.model,
+        modelRegistry: ctx.modelRegistry,
+      });
       const notice = result.details.notice;
       if (notice && ctx.hasUI) {
         ctx.ui.notify(notice, 'warning');
