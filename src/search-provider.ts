@@ -4,7 +4,10 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
     DEFAULT_SEARCH_PROVIDER,
     isRecord,
+    SEARCH_BACKENDS,
     SEARCH_PROVIDERS,
+    type ActiveModelRef,
+    type WebSearchBackend,
     type WebSearchProvider,
 } from "./types.ts";
 
@@ -87,6 +90,34 @@ export function createEmptyStreak(): EmptyStreak {
             notified = false;
         },
     };
+}
+
+const GEMINI_MODEL_PATTERN = /gemini/i;
+const SUPPORTED_GEMINI_APIS_BY_PROVIDER = new Map([
+    ["google-oauth-v2", "google-code-assist"],
+    ["google", "google-generative-ai"],
+]);
+
+export function isWhitelistedGeminiModel(
+    model?: ActiveModelRef | null,
+): model is ActiveModelRef & { id: string; provider: string; api: string } {
+    if (!model?.id || !model.provider || !model.api) return false;
+    return (
+        GEMINI_MODEL_PATTERN.test(model.id) &&
+        SUPPORTED_GEMINI_APIS_BY_PROVIDER.get(model.provider) === model.api
+    );
+}
+
+export interface ChooseSearchProviderInput {
+    envValue?: string;
+    fileValue?: string;
+    activeModel?: ActiveModelRef | null;
+}
+
+export function chooseSearchProvider(input: ChooseSearchProviderInput): WebSearchBackend {
+    if (input.envValue?.trim()) return resolveSearchProvider(undefined, input.envValue);
+    if (isWhitelistedGeminiModel(input.activeModel)) return SEARCH_BACKENDS.GEMINI;
+    return resolveSearchProvider(input.fileValue, undefined);
 }
 
 function matchProvider(value: string): WebSearchProvider | undefined {

@@ -1,11 +1,13 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { runDdgrSearch } from "./providers/ddgr/index.ts";
 import { runDeepSeekSearch } from "./providers/deepseek/index.ts";
+import { runGeminiSearch } from "./providers/gemini/index.ts";
+import type { GeminiActiveModel, GeminiModelRegistry } from "./providers/gemini/types.ts";
 import {
+    chooseSearchProvider,
     PI_WEB_CONFIG_FILE,
     PI_WEB_PROVIDER_ENV,
     readPiWebConfig,
-    resolveSearchProvider,
     type EmptyStreak,
     type PiWebConfig,
 } from "./search-provider.ts";
@@ -15,12 +17,14 @@ import {
     DEFAULT_SEARCH_TIMEOUT_MS,
     MAX_SEARCH_RESULTS,
     MAX_SEARCH_TIMEOUT_MS,
+    SEARCH_BACKENDS,
     SEARCH_PROVIDERS,
+    type ActiveModelRef,
     type NormalizedWebSearchInput,
     type ToolRunResult,
     type WebSearchDetails,
     type WebSearchInput,
-    type WebSearchProvider,
+    type WebSearchBackend,
     type WebSearchTimeRange,
 } from "./types.ts";
 
@@ -31,6 +35,8 @@ export interface RunWebSearchDeps {
     env?: NodeJS.ProcessEnv;
     streak?: EmptyStreak;
     fetchImpl?: typeof fetch;
+    activeModel?: ActiveModelRef;
+    modelRegistry?: Pick<ModelRegistry, "getApiKeyAndHeaders">;
 }
 
 function normalizeInteger(value: unknown, fallback: number, max: number, name: string): number {
@@ -96,6 +102,9 @@ export function renderSearchResults(details: WebSearchDetails): string {
     }
 
     const lines = [`web_search results for: ${details.query}`, ""];
+    if (details.answer) {
+        lines.push(details.answer, "");
+    }
     for (const result of details.results) {
         lines.push(`${result.rank}. ${result.title}`);
         lines.push(`   ${result.url}`);
@@ -115,7 +124,7 @@ export async function runWebSearch(
     const normalized = normalizeSearchInput(input);
     const config = deps.config ?? readPiWebConfig();
     const envValue = deps.env ? deps.env[PI_WEB_PROVIDER_ENV] : process.env[PI_WEB_PROVIDER_ENV];
-    const provider = resolveSearchProvider(config.searchProvider, envValue);
+    const provider = chooseSearchProvider({ envValue, fileValue: config.searchProvider, activeModel: deps.activeModel });
     const threshold = config.notifyAfterEmptyResults ?? DEFAULT_NOTIFY_AFTER_EMPTY_RESULTS;
 
     let details: WebSearchDetails;
@@ -141,19 +150,34 @@ export async function runWebSearch(
 }
 
 async function runProvider(
-    provider: WebSearchProvider,
+    provider: WebSearchBackend,
     pi: Pick<ExtensionAPI, "exec">,
     input: NormalizedWebSearchInput,
     signal: AbortSignal | undefined,
     deps: RunWebSearchDeps,
 ): Promise<WebSearchDetails> {
+    if (provider === SEARCH_BACKENDS.GEMINI) {
+        return runGeminiSearch(input, signal, {
+            fetchImpl: deps.fetchImpl,
+            activeModel: deps.activeModel as GeminiActiveModel | undefined,
+            modelRegistry: deps.modelRegistry as GeminiModelRegistry | undefined,
+        });
+    }
     if (provider === SEARCH_PROVIDERS.DEEPSEEK) {
         return runDeepSeekSearch(input, signal, { fetchImpl: deps.fetchImpl, env: deps.env });
     }
     return runDdgrSearch(pi, input, signal);
 }
 
-function buildAdvice(provider: WebSearchProvider, threshold: number): string {
+function buildAdvice(provider: WebSearchBackend, threshold: number): string {
+    if (provider === SEARCH_BACKENDS.GEMINI) {
+        return [
+            `web_search produced no usable results for the last ${threshold} searches with provider "${provider}".`,
+            "Gemini may answer without using Google Search grounding, which yields no sources.",
+            `Consider switching providers: export ${PI_WEB_PROVIDER_ENV}=${SEARCH_PROVIDERS.DDGR} or ${PI_WEB_PROVIDER_ENV}=${SEARCH_PROVIDERS.DEEPSEEK} (editing ${PI_WEB_CONFIG_FILE} has no effect while a whitelisted *gemini* model is active),`,
+            "switch away from the Gemini model, or rephrase the query.",
+        ].join(" ");
+    }
     const alternative = provider === SEARCH_PROVIDERS.DEEPSEEK ? SEARCH_PROVIDERS.DDGR : SEARCH_PROVIDERS.DEEPSEEK;
     return [
         `web_search produced no usable results for the last ${threshold} searches with provider "${provider}".`,
@@ -166,7 +190,7 @@ function withAdvice(
     error: unknown,
     streak: EmptyStreak | undefined,
     threshold: number,
-    provider: WebSearchProvider,
+    provider: WebSearchBackend,
 ): Error {
     const cause = error instanceof Error ? error : new Error(String(error));
     if (!streak || cause.name === "AbortError" || !streak.recordEmpty(threshold)) return cause;

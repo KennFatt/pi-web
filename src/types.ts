@@ -18,6 +18,20 @@ export const SEARCH_PROVIDERS = {
 
 export type WebSearchProvider = (typeof SEARCH_PROVIDERS)[keyof typeof SEARCH_PROVIDERS];
 
+export const SEARCH_BACKENDS = {
+    ...SEARCH_PROVIDERS,
+    GEMINI: "gemini",
+} as const;
+
+export type WebSearchBackend = (typeof SEARCH_BACKENDS)[keyof typeof SEARCH_BACKENDS];
+
+export interface ActiveModelRef {
+    id?: string;
+    provider?: string;
+    api?: string;
+    baseUrl?: string;
+}
+
 export const DEFAULT_SEARCH_PROVIDER: WebSearchProvider = SEARCH_PROVIDERS.DDGR;
 
 export type WebSearchTimeRange = "d" | "w" | "m" | "y";
@@ -52,8 +66,9 @@ export interface WebSearchResult {
 
 export interface WebSearchDetails {
     query: string;
-    provider: WebSearchProvider;
+    provider: WebSearchBackend;
     results: WebSearchResult[];
+    answer?: string;
     args?: string[];
     endpoint?: string;
     stderr?: string;

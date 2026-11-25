@@ -27,6 +27,17 @@ test("renderSearchResults handles no results", () => {
   assert.match(renderSearchResults({ query: "none", provider: "ddgr", results: [] }), /No web_search results/);
 });
 
+test("renderSearchResults renders a Gemini answer above ranked results", () => {
+  const text = renderSearchResults({
+    query: "frost",
+    provider: "gemini",
+    answer: "Answer with a citation [1].",
+    results: [{ rank: 1, title: "A", url: "https://example.com/a", snippet: "" }],
+  });
+  assert.match(text, /Answer with a citation \[1\]/);
+  assert.ok(text.indexOf("Answer with a citation") < text.indexOf("1. A"));
+});
+
 test("renderSearchResults renders ranked results", () => {
   const text = renderSearchResults({
     query: "frost",
